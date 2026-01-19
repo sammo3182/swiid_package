@@ -1,0 +1,23 @@
+Package: swiidTool
+Title: Download and Process SWIID Dataset from Dataverse
+Version: 0.1.0
+Authors@R: c(
+    person("Yue", "Hu", 
+           email = "yuehu@tsinghua.edu.cn", 
+           role = c("aut", "cre")),
+    person("Ruizhe", "Li", 
+           email = "lirz22@mails.tsinghua.edu.cn", 
+           role = "aut"),
+    person("Xinyi", "Ye", 
+           email = "yexy23@mails.tsinghua.edu.cn", 
+           role = "aut")
+    )
+Description: Provides convenient functions to download the Standardized 
+    World Income Inequality Database (SWIID) from Harvard Dataverse. 
+    Handles API authentication and data retrieval with simple R commands.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.3
+Imports: 
+    dataverse
