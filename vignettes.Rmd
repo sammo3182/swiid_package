@@ -1,0 +1,508 @@
+---
+title: "Getting Started with swiidTool"
+author: "Yue Hu, Ruizhe Li, Xinyi Ye"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with swiidTool}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 7,
+  fig.height = 5
+)
+```
+
+## Introduction
+
+The `swiidTool` package provides a streamlined interface for accessing the Standardized World Income Inequality Database (SWIID) directly from R. SWIID offers the most comprehensive cross-national data on income inequality, providing comparable Gini indices for both market and disposable income across 196 countries from 1960 to the present.
+
+### Why SWIID?
+
+SWIID addresses a critical challenge in comparative inequality research: the lack of standardized, comparable measures across countries and time periods. By using a custom missing-data algorithm, SWIID standardizes data from the Luxembourg Income Study (LIS), OECD Income Distribution Database, Eurostat, World Bank, and many other sources, making cross-national and temporal comparisons more reliable.
+
+### Key Features of swiidTool
+
+- **Simple API**: Download SWIID data with a single function call
+- **Automatic updates**: Easily update to the latest SWIID version
+- **Secure credential management**: Store your Dataverse API key safely
+- **Reproducible workflows**: Integrate seamlessly into your research pipeline
+
+## Installation
+
+Install the development version from GitHub:
+
+```{r install, eval=FALSE}
+# Install devtools if you haven't already
+install.packages("devtools")
+
+# Install swiidTool
+devtools::install_github("sammo3182/swiid_package")
+```
+
+Load the package:
+
+```{r load-package, eval=FALSE}
+library(swiidTool)
+```
+
+## Setting Up Your API Key
+
+### Obtaining an API Key
+
+To download data from Harvard Dataverse, you need an API key:
+
+1. Go to [Harvard Dataverse](https://dataverse.harvard.edu/)
+2. Create an account or log in
+3. Click on your name in the upper right corner
+4. Select "API Token"
+5. Copy your API key
+
+### Configuring the API Key
+
+You can set your API key in two ways:
+
+#### Option 1: Session-only (Temporary)
+
+This sets the API key for your current R session only:
+
+```{r set-key-temp, eval=FALSE}
+set_api_key("your-api-key-here")
+```
+
+#### Option 2: Permanent Installation
+
+This saves your API key to your `.Renviron` file, making it available across all R sessions:
+
+```{r set-key-permanent, eval=FALSE}
+set_api_key("your-api-key-here", install = TRUE)
+```
+
+After installing permanently, restart R for changes to take effect.
+
+**Security Note**: Never share your API key publicly or commit it to version control systems like Git.
+
+## Downloading SWIID Data
+
+### Basic Download
+
+Download SWIID to the default `data/` directory:
+
+```{r download-basic, eval=FALSE}
+download_swiid()
+```
+
+This function will:
+- Create a `data/` directory if it doesn't exist
+- Download the latest SWIID dataset (`.rda` file)
+- Display download progress
+- Report the file location
+
+### Custom Directory
+
+Specify a different destination:
+
+```{r download-custom, eval=FALSE}
+download_swiid(dest_dir = "my_inequality_data")
+```
+
+### Overwriting Existing Data
+
+By default, `download_swiid()` will not overwrite existing files. To force an update:
+
+```{r download-overwrite, eval=FALSE}
+download_swiid(overwrite = TRUE)
+```
+
+This is useful when:
+- SWIID releases a new version
+- You want to ensure you have the latest data
+- Previous downloads were incomplete
+
+## Loading and Exploring the Data
+
+### Loading SWIID
+
+After downloading, load the data into your R environment:
+
+```{r load-data, eval=FALSE}
+load("data/swiid9_5.rda")  # Version number may vary
+```
+
+**Note**: Check the actual filename in your `data/` directory, as version numbers may differ.
+
+### Data Structure
+
+SWIID comes as a data frame with multiple observations per country-year (typically 100 imputations):
+
+```{r explore-structure, eval=FALSE}
+# View structure
+str(swiid_summary)
+
+# View first few rows
+head(swiid_summary)
+
+# Check dimensions
+dim(swiid_summary)
+```
+
+### Key Variables
+
+SWIID includes several important variables:
+
+- **`country`**: Country name
+- **`year`**: Year of observation
+- **`gini_disp`**: Gini index for disposable income (post-tax, post-transfer)
+- **`gini_mkt`**: Gini index for market income (pre-tax, pre-transfer)
+- **`rel_red`**: Relative redistribution (percent reduction from market to disposable)
+- **`abs_red`**: Absolute redistribution (Gini point reduction)
+
+Each variable has multiple imputations to account for measurement uncertainty.
+
+## Practical Examples
+
+### Example 1: Comparing Inequality Across Countries
+
+```{r example-1, eval=FALSE}
+library(dplyr)
+library(ggplot2)
+
+# Calculate mean Gini for recent years
+recent_inequality <- swiid_summary %>%
+  filter(year >= 2015) %>%
+  group_by(country) %>%
+  summarise(
+    mean_gini_disp = mean(gini_disp, na.rm = TRUE),
+    mean_gini_mkt = mean(gini_mkt, na.rm = TRUE)
+  ) %>%
+  arrange(desc(mean_gini_disp))
+
+# Top 10 most unequal countries (disposable income)
+head(recent_inequality, 10)
+
+# Visualize
+ggplot(head(recent_inequality, 20), 
+       aes(x = reorder(country, mean_gini_disp), y = mean_gini_disp)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 20 Most Unequal Countries (2015-present)",
+       x = "Country",
+       y = "Mean Gini Index (Disposable Income)") +
+  theme_minimal()
+```
+
+### Example 2: Tracking Inequality Over Time
+
+```{r example-2, eval=FALSE}
+# Select countries of interest
+countries_of_interest <- c("United States", "China", "Sweden", "Brazil")
+
+# Filter and calculate means
+inequality_trends <- swiid_summary %>%
+  filter(country %in% countries_of_interest) %>%
+  group_by(country, year) %>%
+  summarise(
+    gini_disp = mean(gini_disp, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Plot trends
+ggplot(inequality_trends, aes(x = year, y = gini_disp, color = country)) +
+  geom_line(size = 1) +
+  labs(title = "Inequality Trends: Disposable Income",
+       x = "Year",
+       y = "Gini Index",
+       color = "Country") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+### Example 3: Analyzing Redistribution Effectiveness
+
+```{r example-3, eval=FALSE}
+# Compare market vs. disposable income inequality
+redistribution_analysis <- swiid_summary %>%
+  filter(year >= 2010) %>%
+  group_by(country) %>%
+  summarise(
+    gini_mkt = mean(gini_mkt, na.rm = TRUE),
+    gini_disp = mean(gini_disp, na.rm = TRUE),
+    redistribution = gini_mkt - gini_disp,
+    .groups = "drop"
+  ) %>%
+  arrange(desc(redistribution))
+
+# Countries with strongest redistribution
+head(redistribution_analysis, 10)
+
+# Scatter plot
+ggplot(redistribution_analysis, 
+       aes(x = gini_mkt, y = gini_disp)) +
+  geom_point(alpha = 0.6, color = "darkred") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +
+  labs(title = "Market vs. Disposable Income Inequality",
+       subtitle = "Points below the line indicate redistribution",
+       x = "Market Income Gini",
+       y = "Disposable Income Gini") +
+  theme_minimal()
+```
+
+### Example 4: Regional Comparisons
+
+```{r example-4, eval=FALSE}
+# Define regions (simplified example)
+# In practice, merge with a country-region mapping dataset
+
+east_asia <- c("China", "Japan", "South Korea", "Taiwan")
+europe <- c("Germany", "France", "United Kingdom", "Sweden", "Norway")
+americas <- c("United States", "Canada", "Brazil", "Mexico", "Argentina")
+
+# Compare regions
+regional_comparison <- swiid_summary %>%
+  filter(year >= 2010,
+         country %in% c(east_asia, europe, americas)) %>%
+  mutate(region = case_when(
+    country %in% east_asia ~ "East Asia",
+    country %in% europe ~ "Europe",
+    country %in% americas ~ "Americas"
+  )) %>%
+  group_by(region, year) %>%
+  summarise(
+    mean_gini = mean(gini_disp, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Plot
+ggplot(regional_comparison, aes(x = year, y = mean_gini, color = region)) +
+  geom_line(size = 1) +
+  labs(title = "Regional Inequality Trends",
+       x = "Year",
+       y = "Mean Gini Index (Disposable Income)",
+       color = "Region") +
+  theme_minimal()
+```
+
+## Working with Multiple Imputations
+
+SWIID provides multiple imputed values to account for measurement uncertainty. Here's how to work with them properly:
+
+### Understanding Imputations
+
+```{r imputations, eval=FALSE}
+# Check number of imputations per country-year
+swiid_summary %>%
+  filter(country == "United States", year == 2015) %>%
+  summarise(n_imputations = n())
+```
+
+### Proper Analysis with Imputations
+
+For rigorous analysis, you should:
+
+1. Run your analysis on each imputed dataset separately
+2. Combine results using Rubin's rules
+
+```{r multiple-imputations, eval=FALSE}
+# Example: Regression with multiple imputations
+library(mice)  # For combining results
+
+# Assuming swiid_summary has an 'imputation' identifier
+# Run regression on each imputation
+models <- swiid_summary %>%
+  filter(!is.na(gini_disp)) %>%
+  group_by(imputation) %>%
+  do(model = lm(some_outcome ~ gini_disp + controls, data = .))
+
+# Pool results (if using mice-compatible format)
+# See mice::pool() documentation for details
+```
+
+### Simplified Approach (for exploration)
+
+For exploratory analysis, using means is acceptable:
+
+```{r simple-approach, eval=FALSE}
+# Average across imputations
+swiid_means <- swiid_summary %>%
+  group_by(country, year) %>%
+  summarise(
+    gini_disp = mean(gini_disp, na.rm = TRUE),
+    gini_mkt = mean(gini_mkt, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+## Tips and Best Practices
+
+### 1. Keep Your Data Updated
+
+SWIID is updated regularly. Check for updates periodically:
+
+```{r update-data, eval=FALSE}
+# Download latest version
+download_swiid(overwrite = TRUE)
+```
+
+### 2. Document Your SWIID Version
+
+Always record which SWIID version you used:
+
+```{r document-version, eval=FALSE}
+# Check the filename after download
+list.files("data", pattern = "swiid.*\\.rda")
+
+# In your analysis script, note:
+# Data: SWIID 9.5 (downloaded 2024-01-20)
+```
+
+### 3. Handle Missing Data Carefully
+
+Not all country-years have data:
+
+```{r missing-data, eval=FALSE}
+# Check coverage for your countries of interest
+coverage <- swiid_summary %>%
+  filter(country %in% c("China", "India")) %>%
+  group_by(country, year) %>%
+  summarise(has_data = !all(is.na(gini_disp)), .groups = "drop") %>%
+  filter(has_data)
+
+# Visualize coverage
+ggplot(coverage, aes(x = year, y = country)) +
+  geom_point() +
+  labs(title = "Data Coverage", x = "Year", y = "Country") +
+  theme_minimal()
+```
+
+### 4. Consider Uncertainty
+
+Always account for measurement uncertainty in formal analyses. The multiple imputations exist for this purpose.
+
+### 5. Merge with Other Data
+
+SWIID works well with other datasets:
+
+```{r merge-example, eval=FALSE}
+# Example: merge with governance indicators
+# library(WDI)  # World Bank data
+# 
+# wdi_data <- WDI(indicator = "NY.GDP.PCAP.CD", 
+#                 start = 2000, end = 2020)
+# 
+# merged_data <- swiid_means %>%
+#   left_join(wdi_data, by = c("country", "year"))
+```
+
+## Troubleshooting
+
+### API Key Issues
+
+**Problem**: "API key not found" error
+
+**Solution**: 
+```{r troubleshoot-1, eval=FALSE}
+# Check if key is set
+Sys.getenv("DATAVERSE_SERVER")
+Sys.getenv("DATAVERSE_KEY")
+
+# Reset key
+set_api_key("your-key-here", install = TRUE)
+# Restart R
+```
+
+### Download Failures
+
+**Problem**: Download times out or fails
+
+**Solutions**:
+- Check your internet connection
+- Verify your API key is valid
+- Try downloading to a different directory
+- Check Harvard Dataverse status
+
+### File Loading Issues
+
+**Problem**: `load()` doesn't find the file
+
+**Solution**:
+```{r troubleshoot-2, eval=FALSE}
+# Check what was downloaded
+list.files("data")
+
+# Use correct filename
+load("data/swiid9_5.rda")  # Adjust version number
+```
+
+### Memory Issues
+
+**Problem**: R runs out of memory with full SWIID dataset
+
+**Solution**:
+```{r troubleshoot-3, eval=FALSE}
+# Filter to needed countries/years immediately after loading
+swiid_filtered <- swiid_summary %>%
+  filter(country %in% c("Country1", "Country2"),
+         year >= 2000)
+
+# Remove full dataset from memory
+rm(swiid_summary)
+gc()  # Garbage collection
+```
+
+## Citation and Acknowledgments
+
+### Citing SWIID
+
+If you use SWIID data in your research, please cite:
+
+> Solt, Frederick. 2020. "Measuring Income Inequality Across Countries and Over Time: The Standardized World Income Inequality Database." *Social Science Quarterly* 101(3): 1183-1199. doi: [10.1111/ssqu.12795](https://doi.org/10.1111/ssqu.12795)
+
+BibTeX entry:
+```bibtex
+@article{solt2020measuring,
+  title={Measuring Income Inequality Across Countries and Over Time: The Standardized World Income Inequality Database},
+  author={Solt, Frederick},
+  journal={Social Science Quarterly},
+  volume={101},
+  number={3},
+  pages={1183--1199},
+  year={2020},
+  publisher={Wiley Online Library},
+  doi={10.1111/ssqu.12795}
+}
+```
+
+### Citing swiidTool
+
+```bibtex
+@manual{swiidtool,
+  title={swiidTool: Download and Manage SWIID Data in R},
+  author={Hu, Yue and Li, Ruizhe and Ye, Xinyi},
+  year={2024},
+  note={R package version 0.1.0},
+  url={https://github.com/sammo3182/swiid_package}
+}
+```
+
+## Additional Resources
+
+- **SWIID Official Website**: https://fsolt.org/swiid/
+- **SWIID on Harvard Dataverse**: https://dataverse.harvard.edu/dataverse/swiid
+- **Package GitHub Repository**: https://github.com/sammo3182/swiid_package
+- **Report Issues**: https://github.com/sammo3182/swiid_package/issues
+
+## Conclusion
+
+The `swiidTool` package simplifies access to one of the most important resources for inequality research. By streamlining the download process and integrating seamlessly with R workflows, it helps researchers focus on analysis rather than data management.
+
+For more advanced usage and examples, please refer to:
+- SWIID codebook and documentation
+- Published research using SWIID
+- Package function documentation (`?download_swiid`, `?set_api_key`)
+
+Happy researching!
