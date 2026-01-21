@@ -3,6 +3,7 @@
 #' @param dest_dir Destination directory, default is "data"
 #' @param overwrite Whether to overwrite existing file
 #' @return Path to downloaded .rda file
+#' @importFrom utils unzip
 #' @export
 #' @examples
 #' \dontrun{
